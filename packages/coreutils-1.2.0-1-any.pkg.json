@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "coreutils",
+  "version": "1.2.0",
+  "release": 1,
+  "arch": "any",
+  "description": "Example core utilities package",
+  "license": "MIT",
+  "depends": [],
+  "provides": [
+    "coreutils"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "path": "/usr/bin/coreutils",
+      "content": "#!/bin/sh\necho coreutils\n",
+      "mode": "0755",
+      "owner": "root",
+      "group": "root"
+    }
+  ]
+}

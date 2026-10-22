@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "hello",
+  "version": "1.0.0",
+  "release": 1,
+  "arch": "any",
+  "description": "Minimal hello world package",
+  "license": "MIT",
+  "depends": [],
+  "provides": [
+    "hello"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "path": "/usr/bin/hello",
+      "content": "#!/bin/sh\necho hello\n",
+      "mode": "0755",
+      "owner": "root",
+      "group": "root"
+    }
+  ]
+}

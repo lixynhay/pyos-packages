@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "libc",
+  "version": "1.0.0",
+  "release": 1,
+  "arch": "any",
+  "description": "Example C library package",
+  "license": "MIT",
+  "depends": [],
+  "provides": [
+    "libc"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "path": "/usr/lib/libc.txt",
+      "content": "Example libc placeholder\n",
+      "mode": "0644",
+      "owner": "root",
+      "group": "root"
+    }
+  ]
+}

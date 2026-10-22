@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "repo": "core",
+  "generated": "2026-10-22T20:11:28Z",
+  "packages": [
+    {
+      "name": "coreutils",
+      "version": "1.2.0",
+      "release": 1,
+      "arch": "any",
+      "filename": "coreutils-1.2.0-1-any.pkg.json",
+      "url": "packages/coreutils-1.2.0-1-any.pkg.json",
+      "sha256": "e1b3f48ca4f18be857f34a63c09ff06654ad5b86b6ed88e097c08928fdca633b",
+      "size": 421,
+      "depends": [],
+      "provides": [
+        "coreutils"
+      ],
+      "conflicts": [],
+      "description": "Example core utilities package",
+      "license": "MIT",
+      "signature": null
+    },
+    {
+      "name": "hello",
+      "version": "1.0.0",
+      "release": 1,
+      "arch": "any",
+      "filename": "hello-1.0.0-1-any.pkg.json",
+      "url": "packages/hello-1.0.0-1-any.pkg.json",
+      "sha256": "cdcd0dc69a5ab42eff6275b3d7d01a1897ee156786b0a8180192dbe7671e39c3",
+      "size": 402,
+      "depends": [],
+      "provides": [
+        "hello"
+      ],
+      "conflicts": [],
+      "description": "Minimal hello world package",
+      "license": "MIT",
+      "signature": null
+    },
+    {
+      "name": "libc",
+      "version": "1.0.0",
+      "release": 1,
+      "arch": "any",
+      "filename": "libc-1.0.0-1-any.pkg.json",
+      "url": "packages/libc-1.0.0-1-any.pkg.json",
+      "sha256": "0b37ac1b35587c3ef64a23224b377e21bab086219df0f59e45ea843a520a586a",
+      "size": 404,
+      "depends": [],
+      "provides": [
+        "libc"
+      ],
+      "conflicts": [],
+      "description": "Example C library package",
+      "license": "MIT",
+      "signature": null
+    }
+  ]
+}
