@@ -1,0 +1,43 @@
+name: repo-index
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/**'
+      - 'tools/gen_repo_index.py'
+
+concurrency:
+  group: repo-index
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Regenerate index
+        run: python tools/gen_repo_index.py --repo core
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet -- index.json; then
+            echo "index.json is up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.json
+          git commit -m "chore: rebuild repo index"
+          git push
