@@ -1,8 +1,24 @@
 {
   "format": 1,
   "repo": "core",
-  "generated": "2026-10-22T21:02:56Z",
+  "generated": "2026-10-24T06:00:05Z",
   "packages": [
+    {
+      "name": "blob",
+      "version": "1.0.0",
+      "release": 1,
+      "arch": "any",
+      "filename": "blob-1.0.0-1-any.pkg.json",
+      "url": "packages/blob-1.0.0-1-any.pkg.json",
+      "sha256": "4c09cc1cd56bfa363cb7d718c2405dc7acebf06a1a63fcbcc8c513811a759abf",
+      "size": 442,
+      "depends": [],
+      "provides": [],
+      "conflicts": [],
+      "description": "Binary blob example package",
+      "license": "MIT",
+      "signature": null
+    },
     {
       "name": "coreutils",
       "version": "1.2.0",

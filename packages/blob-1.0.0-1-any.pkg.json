@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "name": "blob",
+  "version": "1.0.0",
+  "release": 1,
+  "arch": "any",
+  "description": "Binary blob example package",
+  "license": "MIT",
+  "depends": [],
+  "provides": [],
+  "conflicts": [],
+  "files": [
+    {
+      "path": "/usr/share/pyos/examples/blob.bin",
+      "content": "UFlPUy1CSU5BUlktRVhBTVBMRQD/EAo=",
+      "encoding": "base64",
+      "mode": "0644",
+      "owner": "root",
+      "group": "root"
+    }
+  ]
+}

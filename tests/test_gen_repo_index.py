@@ -274,6 +274,33 @@ def test_url_is_relative_packages_filename(tmp_path):
     assert ".." not in entry["url"].split("/")
 
 
+def test_index_includes_base64_package_metadata(tmp_path):
+    packages = tmp_path / "packages"
+    raw = make_pkg(
+        packages / "blob-1.0.0-1-any.pkg.json",
+        "blob",
+        "1.0.0",
+        description="Binary blob example package",
+        files=[{
+            "path": "/usr/share/pyos/examples/blob.bin",
+            "content": "UFlPUy1CSU5BUlktRVhBTVBMRQD/EAo=",
+            "encoding": "base64",
+            "mode": "0644",
+            "owner": "root",
+            "group": "root",
+        }],
+    )
+
+    entry = gen.build_index(packages)["packages"][0]
+
+    assert entry["name"] == "blob"
+    assert entry["version"] == "1.0.0"
+    assert entry["release"] == 1
+    assert entry["arch"] == "any"
+    assert entry["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert entry["size"] == len(raw)
+
+
 def test_generated_timestamp_is_utc_iso8601(tmp_path):
     packages = tmp_path / "packages"
     make_pkg(packages / "hello.pkg.json", "hello", "1.0.0")
