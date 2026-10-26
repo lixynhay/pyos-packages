@@ -139,4 +139,4 @@ stderr и пропускает их. Ошибки чтения, JSON, форма
 
 ## Ссылки
 
-- [README pyOS](../code/pyos/README.md)
+- [README pyOS](https://github.com/lixynhay/pyos)
