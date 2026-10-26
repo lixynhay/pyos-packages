@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import re
@@ -362,7 +363,7 @@ def test_rejects_non_object_json(tmp_path):
         gen.build_index(packages)
 
 
-def test_rejects_invalid_utf8(tmp_path):
+def test_invalid_utf8_rejected(tmp_path):
     packages = tmp_path / "packages"
     write_pkg(
         packages / "broken.pkg.json",
@@ -436,7 +437,7 @@ def test_rejects_duplicate_file_paths(tmp_path):
         gen.build_index(packages)
 
 
-def test_rejects_unknown_encoding(tmp_path):
+def test_unknown_encoding_rejected(tmp_path):
     packages = tmp_path / "packages"
     make_pkg(
         packages / "hello.pkg.json", "hello", "1.0.0",
@@ -465,6 +466,100 @@ def test_accepts_current_valid_packages():
     assert [entry["name"] for entry in index["packages"]] == [
         "blob", "coreutils", "hello", "libc",
     ]
+
+
+def test_committed_index_matches_packages():
+    index = json.loads(
+        (REPO_ROOT / "index.json").read_text(encoding="utf-8"))
+    paths = sorted((REPO_ROOT / "packages").glob("*.pkg.json"))
+    entries = {entry["filename"]: entry for entry in index["packages"]}
+
+    assert set(entries) == {path.name for path in paths}
+    assert len(entries) == len(index["packages"])
+
+    for path in paths:
+        raw = path.read_bytes()
+        data = json.loads(raw.decode("utf-8"))
+        entry = entries[path.name]
+
+        assert entry["url"] == f"packages/{path.name}"
+        assert entry["name"] == data["name"]
+        assert entry["version"] == data["version"]
+        assert entry["release"] == int(data.get("release", 1))
+        assert entry["arch"] == data.get("arch", "any")
+        assert entry["sha256"] == hashlib.sha256(raw).hexdigest()
+        assert entry["size"] == len(raw)
+
+
+def test_cli_empty_packages_dir(tmp_path):
+    packages = tmp_path / "packages"
+    packages.mkdir()
+    out = tmp_path / "index.json"
+
+    assert gen.main([
+        "--repo", "core", "--packages", str(packages), "--out", str(out),
+    ]) == 0
+
+    index = json.loads(out.read_text(encoding="utf-8"))
+    assert index["packages"] == []
+
+
+def test_cli_missing_packages_dir(tmp_path, capsys):
+    out = tmp_path / "index.json"
+
+    code = gen.main([
+        "--packages", str(tmp_path / "missing"), "--out", str(out),
+    ])
+
+    assert code == 1
+    assert "not found" in capsys.readouterr().err
+
+
+def test_cli_packages_path_is_file(tmp_path, capsys):
+    packages = tmp_path / "packages"
+    packages.write_text("{}", encoding="utf-8")
+    out = tmp_path / "index.json"
+
+    code = gen.main([
+        "--packages", str(packages), "--out", str(out),
+    ])
+
+    assert code == 1
+    assert "not a directory" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("release", [-1, "abc", True, 1.5])
+def test_invalid_release_rejected(tmp_path, release):
+    packages = tmp_path / "packages"
+    make_pkg(packages / "hello.pkg.json", "hello", "1.0.0", release=release)
+
+    with pytest.raises(gen.RepoIndexError, match="release"):
+        gen.build_index(packages)
+
+
+@pytest.mark.parametrize("arch", ["", 5, None])
+def test_invalid_arch_rejected(tmp_path, arch):
+    packages = tmp_path / "packages"
+    make_pkg(packages / "hello.pkg.json", "hello", "1.0.0", arch=arch)
+
+    with pytest.raises(gen.RepoIndexError, match="arch"):
+        gen.build_index(packages)
+
+
+def test_blob_package_exact_bytes():
+    path = REPO_ROOT / "packages" / "blob-1.0.0-1-any.pkg.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    assert len(data["files"]) == 1
+    entry = data["files"][0]
+    decoded = base64.b64decode(entry["content"], validate=True)
+
+    assert entry["path"] == "/usr/share/pyos/examples/blob.bin"
+    assert decoded == b"PYOS-BINARY-EXAMPLE\x00\xff\x10\n"
+    assert len(decoded) == 23
+    assert entry["mode"] == "0644"
+    assert entry["owner"] == "root"
+    assert entry["group"] == "root"
 
 
 def test_generator_does_not_import_pyos():
