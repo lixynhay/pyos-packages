@@ -169,6 +169,82 @@ def _validate_relative_url(url, path):
             f"{path}: generated url is not a safe relative path: {url!r}")
 
 
+def _validate_name(name, path):
+    if "/" in name or "\\" in name or name in (".", ".."):
+        raise RepoIndexError(f"{path}: invalid package name {name!r}")
+
+
+def _normalize_file_path(raw_path, path):
+    """Validate an absolute package path and normalize duplicate spellings."""
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        raise RepoIndexError(
+            f"{path}: file path must be absolute: {raw_path!r}")
+
+    parts = []
+    for part in raw_path.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            raise RepoIndexError(
+                f"{path}: path traversal is not allowed: {raw_path!r}")
+        parts.append(part)
+
+    if not parts:
+        raise RepoIndexError(f"{path}: invalid file path: {raw_path!r}")
+    return "/" + "/".join(parts)
+
+
+def _parse_mode(raw_mode, file_path, path):
+    """Parse a pyOS file mode: string values are octal, numbers are decimal."""
+    if isinstance(raw_mode, bool) or not isinstance(raw_mode, (int, str)):
+        raise RepoIndexError(
+            f"{path}: invalid mode for {file_path!r}: {raw_mode!r}")
+    try:
+        mode = int(raw_mode, 8) if isinstance(raw_mode, str) else raw_mode
+    except ValueError as exc:
+        raise RepoIndexError(
+            f"{path}: invalid mode for {file_path!r}: {raw_mode!r}") from exc
+    if not 0 <= mode <= 0o7777:
+        raise RepoIndexError(
+            f"{path}: invalid mode for {file_path!r}: {raw_mode!r}")
+    return mode
+
+
+def _validate_files(data, path):
+    raw_files = data.get("files", [])
+    if not isinstance(raw_files, list):
+        raise RepoIndexError(f"{path}: 'files' must be a list")
+
+    seen = set()
+    for entry in raw_files:
+        if not isinstance(entry, dict):
+            raise RepoIndexError(f"{path}: file entry must be an object")
+
+        file_path = _normalize_file_path(entry.get("path"), path)
+        if file_path in seen:
+            raise RepoIndexError(
+                f"{path}: duplicate file path {file_path!r}")
+        seen.add(file_path)
+
+        if "encoding" in entry:
+            encoding = entry["encoding"]
+            if not isinstance(encoding, str):
+                raise RepoIndexError(
+                    f"{path}: 'encoding' must be a string")
+            if encoding.lower() not in ("utf-8", "utf8", "base64"):
+                raise RepoIndexError(
+                    f"{path}: unsupported encoding {encoding!r} "
+                    "(expected utf-8 or base64)")
+
+        _parse_mode(entry.get("mode", "0644"), file_path, path)
+
+        for field in ("owner", "group"):
+            value = entry.get(field, "root")
+            if not isinstance(value, str):
+                raise RepoIndexError(
+                    f"{path}: '{field}' must be a string")
+
+
 def load_package(path):
     """Read and validate one .pkg.json file, returning an index entry."""
     data, raw = _read_json(path)
@@ -181,12 +257,15 @@ def load_package(path):
             f"(expected {PACKAGE_FORMAT})")
 
     name = _require_string(data, "name", path)
+    _validate_name(name, path)
     version = _require_string(data, "version", path)
     release = _read_release(data, path)
 
     arch = data.get("arch", "any")
     if not isinstance(arch, str) or not arch:
         raise RepoIndexError(f"{path}: invalid 'arch' {arch!r}")
+
+    _validate_files(data, path)
 
     filename = path.name
     url = f"packages/{filename}"

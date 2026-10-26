@@ -1,11 +1,17 @@
 import hashlib
 import json
 import re
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
 from tools import gen_repo_index as gen
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def write_pkg(path, data=None, raw=None):
@@ -346,3 +352,133 @@ def test_cli_returns_nonzero_on_invalid_package(tmp_path, capsys):
 
     assert code == 1
     assert "error:" in capsys.readouterr().err
+
+
+def test_rejects_non_object_json(tmp_path):
+    packages = tmp_path / "packages"
+    write_pkg(packages / "list.pkg.json", raw=b"[]")
+
+    with pytest.raises(gen.RepoIndexError, match="must be a JSON object"):
+        gen.build_index(packages)
+
+
+def test_rejects_invalid_utf8(tmp_path):
+    packages = tmp_path / "packages"
+    write_pkg(
+        packages / "broken.pkg.json",
+        raw=b'{"format": 1, "name": "\xff", "version": "1.0.0"}',
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="not valid UTF-8"):
+        gen.build_index(packages)
+
+
+def test_rejects_invalid_name_slash(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(packages / "bad.pkg.json", "bad/name", "1.0.0")
+
+    with pytest.raises(gen.RepoIndexError, match="invalid package name"):
+        gen.build_index(packages)
+
+
+def test_rejects_invalid_name_dotdot(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(packages / "bad.pkg.json", "..", "1.0.0")
+
+    with pytest.raises(gen.RepoIndexError, match="invalid package name"):
+        gen.build_index(packages)
+
+
+def test_rejects_files_not_list(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files={"path": "/usr/bin/hello"},
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="'files' must be a list"):
+        gen.build_index(packages)
+
+
+def test_rejects_relative_file_path(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files=[{"path": "usr/bin/hello"}],
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="must be absolute"):
+        gen.build_index(packages)
+
+
+def test_rejects_file_path_traversal(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files=[{"path": "/usr/../etc/passwd"}],
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="path traversal"):
+        gen.build_index(packages)
+
+
+def test_rejects_duplicate_file_paths(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files=[
+            {"path": "/usr/bin/hello"},
+            {"path": "/usr//bin/./hello"},
+        ],
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="duplicate file path"):
+        gen.build_index(packages)
+
+
+def test_rejects_unknown_encoding(tmp_path):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files=[{"path": "/usr/bin/hello", "encoding": "latin-1"}],
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="unsupported encoding"):
+        gen.build_index(packages)
+
+
+@pytest.mark.parametrize("mode", ["9999", -1, "rwx", 755.5])
+def test_rejects_invalid_mode(tmp_path, mode):
+    packages = tmp_path / "packages"
+    make_pkg(
+        packages / "hello.pkg.json", "hello", "1.0.0",
+        files=[{"path": "/usr/bin/hello", "mode": mode}],
+    )
+
+    with pytest.raises(gen.RepoIndexError, match="invalid mode"):
+        gen.build_index(packages)
+
+
+def test_accepts_current_valid_packages():
+    index = gen.build_index(REPO_ROOT / "packages")
+
+    assert [entry["name"] for entry in index["packages"]] == [
+        "blob", "coreutils", "hello", "libc",
+    ]
+
+
+def test_generator_does_not_import_pyos():
+    code = (
+        "import sys\n"
+        "import tools.gen_repo_index\n"
+        "print('pyos' in sys.modules)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
