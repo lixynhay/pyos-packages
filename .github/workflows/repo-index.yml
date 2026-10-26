@@ -18,10 +18,13 @@ permissions:
 
 jobs:
   build-index:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -31,14 +34,47 @@ jobs:
       - name: Regenerate index
         run: python tools/gen_repo_index.py --repo core
 
-      - name: Commit and push if changed
+      - name: Check for meaningful index changes
+        id: index
         run: |
-          if git diff --quiet -- index.json; then
-            echo "index.json is up to date"
-            exit 0
-          fi
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          path = pathlib.Path("index.json")
+          old_text = subprocess.run(
+              ["git", "show", "HEAD:index.json"],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout
+          new_text = path.read_text(encoding="utf-8")
+
+          old_index = json.loads(old_text)
+          new_index = json.loads(new_text)
+          old_index.pop("generated", None)
+          new_index.pop("generated", None)
+          changed = old_index != new_index
+
+          if not changed:
+              subprocess.run(
+                  ["git", "checkout", "--", "index.json"], check=True)
+              print("index.json changed only in generated timestamp")
+          else:
+              print("index.json has meaningful changes")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"changed={'true' if changed else 'false'}\n")
+          PY
+
+      - name: Commit and push if changed
+        if: steps.index.outputs.changed == 'true'
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.json
           git commit -m "chore: rebuild repo index"
+          git pull --rebase origin main
           git push
