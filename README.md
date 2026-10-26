@@ -12,13 +12,19 @@
 pyos-packages/
   index.json
   packages/
+    blob-1.0.0-1-any.pkg.json
+    coreutils-1.2.0-1-any.pkg.json
     hello-1.0.0-1-any.pkg.json
     libc-1.0.0-1-any.pkg.json
-    coreutils-1.2.0-1-any.pkg.json
   tools/
+    __init__.py
     gen_repo_index.py
   tests/
     test_gen_repo_index.py
+  .github/
+    workflows/
+      repo-index.yml
+      tests.yml
 ```
 
 ## Добавление пакета
@@ -49,20 +55,24 @@ pyos-packages/
 как текст, остальное — как base64. Старые пакеты без `encoding` остаются
 совместимыми.
 
-Генератор индекса не декодирует `content` и не проверяет кодировку: ему
-достаточно метаданных пакета. Поэтому для base64-файлов изменения в
-`tools/gen_repo_index.py` не требуются.
+Base64 поддерживается внутри `.pkg.json`. Генератор не декодирует `content`,
+но проверяет, что `encoding` — одно из допустимых значений
+(`utf-8`, `utf8`, `base64`). Поэтому для base64-файлов дополнительные
+изменения в `tools/gen_repo_index.py` не требуются.
 
 ## Генерация индекса
 
-`index.json` перегенерируется автоматически GitHub Action
-(`.github/workflows/repo-index.yml`) при push в `main`, если изменены файлы
-в `packages/**` или `tools/gen_repo_index.py`. Action
-запускает генератор, и если `index.json` изменился, коммитит его с сообщением
-`chore: rebuild repo index` и пушит обратно в `main`. Сам `index.json` не
-входит в paths триггера, поэтому цикл не возникает.
+`index.json` перегенерируется автоматически GitHub Actions workflow
+`.github/workflows/repo-index.yml` при push в `main`, если изменены файлы
+в `packages/**` или `tools/gen_repo_index.py`. Workflow запускает генератор
+и коммитит `index.json` только при содержательных изменениях: если отличается
+лишь поле `generated`, коммит не создаётся. Перед push выполняется
+`git pull --rebase origin main`. Сам `index.json` не входит в paths триггера,
+поэтому цикл не возникает.
 
-Ручной запуск по-прежнему поддерживается. Из корня репозитория:
+Ручной запуск через `workflow_dispatch` разрешён только для `main`: job
+пропускается, если workflow запущен из другой ветки. Локальный ручной запуск
+по-прежнему поддерживается. Из корня репозитория:
 
 ```sh
 python tools/gen_repo_index.py
@@ -84,8 +94,18 @@ python tools/gen_repo_index.py [--repo NAME] [--packages DIR] [--out FILE]
 `pyos`.
 
 Подкаталоги внутри `packages/` не обходятся: генератор печатает warning в
-stderr и пропускает их. Ошибки чтения, JSON, формата, обязательных полей и
-дубликатов также печатаются в stderr, код выхода ненулевой.
+stderr и пропускает их.
+
+Генератор выполняет структурную валидацию минимального контракта и не
+индексирует заведомо invalid `.pkg.json`: проверяет JSON-объект, UTF-8,
+`format`, обязательные поля, имя, `release`/`arch`, `files` (абсолютные пути
+без `..`, дубликаты, `encoding`, `mode`, `owner`/`group`), списки
+`depends`/`provides`/`conflicts` и дубликаты NVR. Ошибки печатаются в stderr,
+код выхода ненулевой.
+
+Это не полная репликация pyOS: генератор не декодирует `content`, не проверяет
+существование пользователей и зависимостей и не исполняет код пакетов.
+Финальная валидация содержимого и установка остаются за pyOS.
 
 `index.json` записывается атомарно: сначала во временный файл в том же
 каталоге, затем через `os.replace`.
@@ -127,6 +147,17 @@ stderr и пропускает их. Ошибки чтения, JSON, форма
 `filename` по возрастанию. Поддерживаются epoch и числовые сегменты версии:
 `1.9 < 1.10`, `1.0 < 1.0.1`, `1:1.0 < 2:0.1`.
 
+## Тестирование
+
+Из корня репозитория:
+
+```sh
+python -m pytest tests -q
+```
+
+CI workflow `.github/workflows/tests.yml` запускает эти же тесты на push в
+`main` и на pull request.
+
 ## Ограничения
 
 - `.pkg.json` поддерживает файлы в UTF-8 и base64 (`files[].encoding`).
@@ -135,7 +166,8 @@ stderr и пропускает их. Ошибки чтения, JSON, форма
   генератор не декодирует base64 внутри пакета.
 - `signature` на этом этапе всегда `null`; подписи не реализованы.
 - GitHub Action автоматически перегенерирует `index.json` при push в
-  `packages/**` или `tools/gen_repo_index.py`; ручной запуск также доступен.
+  `packages/**` или `tools/gen_repo_index.py`; локальный ручной запуск также
+  доступен.
 
 ## Ссылки
 
